@@ -1,0 +1,133 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Task Management API
+
+Resources:
+  # DynamoDB Table for Users
+  UsersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: Users
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
+  # DynamoDB Table for Tasks
+  TasksTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: Tasks
+      AttributeDefinitions:
+        - AttributeName: taskId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: taskId
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
+  # SQS Queue for Task Assignments
+  TaskAssignmentQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: TaskAssignmentQueue.fifo
+      FifoQueue: true
+      ContentBasedDeduplication: true
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt TaskAssignmentDLQ.Arn
+        maxReceiveCount: 3
+
+  # Dead Letter Queue for Task Assignments
+  TaskAssignmentDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: TaskAssignmentDLQ.fifo
+      FifoQueue: true
+
+  # SNS Topic for Task Assignment Notifications
+  TaskAssignmentNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: TaskAssignmentNotificationTopic
+      FifoTopic: true
+      ContentBasedDeduplication: true
+
+  # Lambda Function to Create User
+  CreateUserFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./target/lambda.jar
+      Handler: com.example.CreateUserHandler::handleRequest
+      Runtime: java21
+      MemorySize: 512
+      Timeout: 30
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTable
+      Environment:
+        Variables:
+          USERS_TABLE: !Ref UsersTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            Path: /users
+            Method: POST
+
+  # Lambda Function to Create Task
+  CreateTaskFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./target/lambda.jar
+      Handler: com.example.CreateTaskHandler::handleRequest
+      Runtime: java21
+      MemorySize: 512
+      Timeout: 30
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TasksTable
+        - SQSSendMsgPolicy:
+            QueueName: !GetAtt TaskAssignmentQueue.QueueName
+      Environment:
+        Variables:
+          TASKS_TABLE: !Ref TasksTable
+          TASK_ASSIGNMENT_QUEUE: !Ref TaskAssignmentQueue
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            Path: /tasks
+            Method: POST
+
+  # Lambda Function to Process Task Assignment Notifications
+  ProcessTaskAssignmentFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./target/lambda.jar
+      Handler: com.example.ProcessTaskAssignmentHandler::handleRequest
+      Runtime: java21
+      MemorySize: 512
+      Timeout: 30
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref UsersTable
+        - SNSPublishPolicy:
+            TopicName: !GetAtt TaskAssignmentNotificationTopic.TopicName
+      Environment:
+        Variables:
+          USERS_TABLE: !Ref UsersTable
+          SNS_TOPIC_ARN: !Ref TaskAssignmentNotificationTopic
+      Events:
+        SqsEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt TaskAssignmentQueue.Arn
+            BatchSize: 10
+
+Outputs:
+  ApiUrl:
+    Description: API Gateway endpoint URL
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
