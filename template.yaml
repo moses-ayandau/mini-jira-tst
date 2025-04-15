@@ -67,9 +67,16 @@ Resources:
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref UsersTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - sns:Subscribe
+                - sns:Publish
+              Resource: !Ref TaskAssignmentNotificationTopic
       Environment:
         Variables:
           USERS_TABLE: !Ref UsersTable
+          SNS_TOPIC_ARN: !Ref TaskAssignmentNotificationTopic
       Events:
         Api:
           Type: Api
@@ -90,7 +97,7 @@ Resources:
         - DynamoDBCrudPolicy:
             TableName: !Ref TasksTable
         - SQSSendMsgPolicy:
-            QueueName: !GetAtt TaskAssignmentQueue.QueueName
+            QueueName: TaskAssignmentQueue.fifo
       Environment:
         Variables:
           TASKS_TABLE: !Ref TasksTable
@@ -115,7 +122,7 @@ Resources:
         - DynamoDBReadPolicy:
             TableName: !Ref UsersTable
         - SNSPublishPolicy:
-            TopicName: !GetAtt TaskAssignmentNotificationTopic.TopicName
+            TopicName: TaskAssignmentNotificationTopic
       Environment:
         Variables:
           USERS_TABLE: !Ref UsersTable
