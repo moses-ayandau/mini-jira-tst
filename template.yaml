@@ -59,8 +59,8 @@ Resources:
   CreateUserFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ./target/lambda.jar
-      Handler: com.example.CreateUserHandler::handleRequest
+      CodeUri: HelloWorldFunction/
+      Handler: helloworld.CreateUserHandler::handleRequest
       Runtime: java21
       MemorySize: 512
       Timeout: 30
@@ -81,8 +81,8 @@ Resources:
   CreateTaskFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ./target/lambda.jar
-      Handler: com.example.CreateTaskHandler::handleRequest
+      CodeUri: HelloWorldFunction/
+      Handler: helloworld.CreateTaskHandler::handleRequest
       Runtime: java21
       MemorySize: 512
       Timeout: 30
@@ -106,8 +106,8 @@ Resources:
   ProcessTaskAssignmentFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ./target/lambda.jar
-      Handler: com.example.ProcessTaskAssignmentHandler::handleRequest
+      CodeUri: HelloWorldFunction/
+      Handler: helloworld.ProcessTaskAssignmentHandler::handleRequest
       Runtime: java21
       MemorySize: 512
       Timeout: 30
