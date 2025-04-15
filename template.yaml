@@ -96,8 +96,11 @@ Resources:
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref TasksTable
-        - SQSSendMsgPolicy:
-            QueueName: TaskAssignmentQueue.fifo
+        - Statement:
+            - Effect: Allow
+              Action:
+                - sqs:SendMessage
+              Resource: !GetAtt TaskAssignmentQueue.Arn
       Environment:
         Variables:
           TASKS_TABLE: !Ref TasksTable
@@ -121,8 +124,11 @@ Resources:
       Policies:
         - DynamoDBReadPolicy:
             TableName: !Ref UsersTable
-        - SNSPublishPolicy:
-            TopicName: TaskAssignmentNotificationTopic
+        - Statement:
+            - Effect: Allow
+              Action:
+                - sns:Publish
+              Resource: !Ref TaskAssignmentNotificationTopic
       Environment:
         Variables:
           USERS_TABLE: !Ref UsersTable
