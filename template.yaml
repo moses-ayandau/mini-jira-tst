@@ -79,7 +79,7 @@ Resources:
                 - sns:Subscribe
                 - sns:Publish
               Resource: 
-                !Ref TaskAssignmentNotificationTopic
+                - !Ref TaskAssignmentNotificationTopic
                 - !Ref EmailNotificationTopic
       Environment:
         Variables:
