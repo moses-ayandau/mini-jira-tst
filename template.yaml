@@ -85,6 +85,8 @@ Resources:
         Variables:
           USERS_TABLE: !Ref UsersTable
           SNS_TOPIC_ARN: !Ref TaskAssignmentNotificationTopic
+          EMAIL_NOTIFICATION_TOPIC_ARN: !Ref EmailNotificationTopic
+
       Events:
         Api:
           Type: Api
