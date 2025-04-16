@@ -55,6 +55,12 @@ Resources:
       FifoTopic: true
       ContentBasedDeduplication: true
 
+  EmailNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: EmailNotificationTopic
+      DisplayName: "Task Notifications"
+
   # Lambda Function to Create User
   CreateUserFunction:
     Type: AWS::Serverless::Function
@@ -72,7 +78,9 @@ Resources:
               Action:
                 - sns:Subscribe
                 - sns:Publish
-              Resource: !Ref TaskAssignmentNotificationTopic
+              Resource: 
+                !Ref TaskAssignmentNotificationTopic
+                - !Ref EmailNotificationTopic
       Environment:
         Variables:
           USERS_TABLE: !Ref UsersTable

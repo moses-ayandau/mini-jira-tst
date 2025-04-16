@@ -12,6 +12,10 @@ public class User {
     @JsonProperty("role")
     private String role;
 
+    private Boolean receiveNotifications;
+    private String subscriptionArn;
+
+
     // Default constructor for Jackson
     public User() {}
 
@@ -43,5 +47,21 @@ public class User {
 
     public void setRole(String role) {
         this.role = role;
+    }
+
+    public Boolean getReceiveNotifications() {
+        return receiveNotifications;
+    }
+
+    public void setReceiveNotifications(Boolean receiveNotifications) {
+        this.receiveNotifications = receiveNotifications;
+    }
+
+    public String getSubscriptionArn() {
+        return subscriptionArn;
+    }
+
+    public void setSubscriptionArn(String subscriptionArn) {
+        this.subscriptionArn = subscriptionArn;
     }
 }
