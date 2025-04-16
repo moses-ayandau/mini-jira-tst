@@ -21,7 +21,6 @@ public class Task {
     @JsonProperty("userId")
     private String userId;
 
-    // Default constructor for Jackson
     public Task() {}
 
     public Task(String taskId, String name, String description, String status, String deadline, String userId) {

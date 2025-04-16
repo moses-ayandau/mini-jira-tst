@@ -51,7 +51,7 @@ Resources:
   TaskAssignmentNotificationTopic:
     Type: AWS::SNS::Topic
     Properties:
-      TopicName: TaskAssignmentNotificationTopic
+      TopicName: TaskAssignmentNotificationTopic.fifo
       FifoTopic: true
       ContentBasedDeduplication: true
 
