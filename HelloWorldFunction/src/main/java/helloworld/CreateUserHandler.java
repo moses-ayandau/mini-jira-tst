@@ -27,68 +27,74 @@ public class CreateUserHandler implements RequestHandler<APIGatewayProxyRequestE
     private final String emailNotificationTopicArn = System.getenv("EMAIL_NOTIFICATION_TOPIC_ARN");
 
     @Override
-    public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent input, Context context) {
-        try {
-            // Parse and validate user input
-            User user = objectMapper.readValue(input.getBody(), User.class);
-            if (user.getEmail() == null || user.getEmail().isEmpty()) {
-                return new APIGatewayProxyResponseEvent()
-                        .withStatusCode(400)
-                        .withBody("{\"error\": \"Email is required\"}");
-            }
-            user.setUserId(UUID.randomUUID().toString());
-            user.setRole(user.getRole() != null ? user.getRole() : "team_member");
-
-            // Create attribute map for DynamoDB
-            Map<String, AttributeValue> item = new HashMap<>();
-            item.put("userId", AttributeValue.builder().s(user.getUserId()).build());
-            item.put("email", AttributeValue.builder().s(user.getEmail()).build());
-            item.put("role", AttributeValue.builder().s(user.getRole()).build());
-            
-            // Add preferences for task notifications (default to true)
-            boolean receiveNotifications = user.getReceiveNotifications() != null ? user.getReceiveNotifications() : true;
-            item.put("receiveNotifications", AttributeValue.builder().bool(receiveNotifications).build());
-            user.setReceiveNotifications(receiveNotifications);
-
-            // Store user in DynamoDB
-            dynamoDbClient.putItem(PutItemRequest.builder()
-                    .tableName(usersTable)
-                    .item(item)
-                    .build());
-
-            // Subscribe user to email notifications if they opted in
-            if (receiveNotifications) {
-                // Subscribe to standard SNS topic for email notifications
+public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent input, Context context) {
+    try {
+        // Parse user input
+        User user = objectMapper.readValue(input.getBody(), User.class);
+        if (user.getEmail() == null || user.getEmail().isEmpty()) {
+            return new APIGatewayProxyResponseEvent()
+                    .withStatusCode(400)
+                    .withBody("{\"error\": \"Email is required\"}");
+        }
+        
+        // Set default values
+        user.setUserId(UUID.randomUUID().toString());
+        user.setRole(user.getRole() != null ? user.getRole() : "team_member");
+        boolean receiveNotifications = user.getReceiveNotifications() != null ? user.getReceiveNotifications() : true;
+        user.setReceiveNotifications(receiveNotifications);
+        
+        // Create DynamoDB entry
+        Map<String, AttributeValue> item = new HashMap<>();
+        item.put("userId", AttributeValue.builder().s(user.getUserId()).build());
+        item.put("email", AttributeValue.builder().s(user.getEmail()).build());
+        item.put("role", AttributeValue.builder().s(user.getRole()).build());
+        item.put("receiveNotifications", AttributeValue.builder().bool(receiveNotifications).build());
+        
+        // Add subscription status - this is what registers them with the notification system
+        item.put("subscribedToTasks", AttributeValue.builder().bool(true).build());
+        
+        // Store user in DynamoDB
+        dynamoDbClient.putItem(PutItemRequest.builder()
+                .tableName(usersTable)
+                .item(item)
+                .build());
+        
+        // Subscribe to email notifications if user opted in
+        if (receiveNotifications && emailNotificationTopicArn != null && !emailNotificationTopicArn.isEmpty()) {
+            try {
+                // This subscribes them to the standard (non-FIFO) email topic
                 SubscribeResponse response = snsClient.subscribe(SubscribeRequest.builder()
                         .topicArn(emailNotificationTopicArn)
                         .protocol("email")
                         .endpoint(user.getEmail())
                         .returnSubscriptionArn(true)
                         .build());
+
+                context.getLogger().log("Email subscription: " + response.subscriptionArn());
                 
-                // Store subscription ARN in user record for future management
-                // Note: For email protocol, the subscription ARN will be "pending confirmation"
-                // until the user confirms via the email they receive
+                // Store subscription ARN
                 if (response.subscriptionArn() != null) {
                     dynamoDbClient.updateItem(builder -> builder
                         .tableName(usersTable)
                         .key(Map.of("userId", AttributeValue.builder().s(user.getUserId()).build()))
-                        .updateExpression("SET subscriptionArn = :arn")
+                        .updateExpression("SET emailSubscriptionArn = :arn")
                         .expressionAttributeValues(Map.of(":arn", AttributeValue.builder().s(response.subscriptionArn()).build())));
                 }
-                
-                context.getLogger().log("User subscribed to notifications: " + response.subscriptionArn());
+            } catch (Exception e) {
+                context.getLogger().log("Error with email subscription: " + e.getMessage());
+                // Don't fail user creation if subscription fails
             }
-
-            return new APIGatewayProxyResponseEvent()
-                    .withStatusCode(200)
-                    .withBody(objectMapper.writeValueAsString(user))
-                    .withHeaders(Map.of("Content-Type", "application/json"));
-        } catch (Exception e) {
-            context.getLogger().log("Error: " + e.getMessage());
-            return new APIGatewayProxyResponseEvent()
-                    .withStatusCode(500)
-                    .withBody("{\"error\": \"" + e.getMessage() + "\"}");
         }
+        
+        return new APIGatewayProxyResponseEvent()
+                .withStatusCode(200)
+                .withBody(objectMapper.writeValueAsString(user))
+                .withHeaders(Map.of("Content-Type", "application/json"));
+    } catch (Exception e) {
+        context.getLogger().log("Error: " + e.getMessage());
+        return new APIGatewayProxyResponseEvent()
+                .withStatusCode(500)
+                .withBody("{\"error\": \"" + e.getMessage() + "\"}");
     }
+}
 }
